@@ -37,6 +37,8 @@ class Ship(pygame.sprite.Sprite):
         self.image = pygame.image.load("assets/ship.png")
         self.rect.x = 375
         self.rect.y = 500
+        self.shootSpeed = 1
+        self.laserEnabled = 0
 
     def draw(self, screen):
         screen.blit(self.image, self.rect)
@@ -88,10 +90,36 @@ class Bullet(pygame.sprite.Sprite):
         self.rect.x += self.vector[0]
         self.rect.y += self.vector[1]
 
+
 class PowerUp(pygame.sprite.Sprite):
     def __init__(self):
-        super(pygame.sprite.Sprite, self).__init__()
-        self.type = random.choice(['speed', 'explode', 'extra-life'])
+        pygame.sprite.Sprite.__init__(self)
+        self.type = random.choice(['quick-shot', 'extra-life', 'laser'])
+        self.image = pygame.Surface((25, 25))
+        self.image.fill((0, 0, 0))
+        self.image = pygame.image.load("assets/"+self.type+".png")
+        self.rect = self.image.get_rect()
+        self.rect.x = random.randrange(0, 780, 1)
+        self.rect.y = 0
+        self.vector = [0, 1]
+
+    def update(self, game):
+        self.rect.y += self.vector[1]
+        hitObject = pygame.sprite.collide_rect(self, game.ship)
+        if hitObject and self.type == 'quick-shot':
+            game.ship.shootSpeed = .5
+            self.kill()
+        if hitObject and self.type == 'extra-life':
+            game.lives += 1
+            self.kill()
+        if hitObject and self.type == 'laser':
+            game.ship.laserEnabled = 1
+            self.kill()
+        if self.rect.top > 800:
+            self.kill()
+            game.powerups.remove(self)
+
+
 
 class Game:
     def __init__(self):
@@ -100,8 +128,8 @@ class Game:
         self.clock = pygame.time.Clock()
         self.screen = pygame.display.set_mode((800, 600))
         self.bullets = pygame.sprite.Group()
-        self.bullets.add(Bullet())
         self.ship = Ship()
+        self.powerups = pygame.sprite.Group()
         self.new_life_event = pygame.event.Event(pygame.USEREVENT + 1)
         self.aliens = pygame.sprite.Group()
         self.overlay = Overlay()
@@ -110,8 +138,8 @@ class Game:
         self.ready = True
         self.score = 0
         self.lives = 1
-        for i in range(0, 1):
-            for j in range(0, 1):
+        for i in range(0, 4):
+            for j in range(0, 8):
                 alien = Alien()
                 alien.rect.x = j * 60 + 155
                 alien.start = alien.rect.x
@@ -149,11 +177,13 @@ class Game:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE and self.ready:
                         this_time = time.time()
-                        if this_time - last_time > 1:
+                        if this_time - last_time > self.ship.shootSpeed:
                             bullet = Bullet()
-                            bullet.image.fill((255, 255, 0))
                             bullet.vector = [0, -1]
                             bullet.owner = 1
+                            if self.ship.laserEnabled:
+                                bullet.image = pygame.Surface((25, 75))
+                            bullet.image.fill((255, 255, 0))
                             bullet.rect.x = self.ship.rect.x + 23
                             self.bullets.add(bullet)
                             last_time = time.time()
@@ -179,15 +209,19 @@ class Game:
                     angry_bullet.rect.x = angry_fellow.rect.x + 20
                     angry_bullet.rect.y = angry_fellow.rect.y + 35
                     self.bullets.add(angry_bullet)
+                    powerup = PowerUp()
+                    self.powerups.add(powerup)
                     enemy_hold = time.time()
                     fire_interval = random.randrange(1, 4, 1)
 
             self.bullets.update(self, self.aliens, self.ship)
             self.overlay.update(self.score, self.lives)
             self.aliens.update()
+            self.powerups.update(self)
             self.bullets.draw(self.screen)
             self.ship.draw(self.screen)
             self.aliens.draw(self.screen)
+            self.powerups.draw(self.screen)
             self.overlay.draw(self.screen)
             pygame.display.flip()
             self.clock.tick(60)
@@ -195,6 +229,7 @@ class Game:
         time.sleep(3)
         pygame.quit()
         sys.exit(0)
+
 
 class Outro(pygame.sprite.Sprite):
     def __init__(self):
@@ -207,6 +242,7 @@ class Outro(pygame.sprite.Sprite):
     def draw(self, screen, text):
         text = self.font.render(text, True, (0, 255, 255))
         screen.blit(text, (150, 200))
+
 
 if __name__ == "__main__":
     game = Game()
